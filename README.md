@@ -1,6 +1,6 @@
 # whichboot.gb
 
-![Whichboot.gb running on a DMG Gameboy](screenshots/whichboot-dmg.png) ![Whichboot.gb running on a GBC Gameboy with the older GBC0 boot ROM](screenshots/whichboot-gbc0.png) ![Whichboot.gb running on a Maxstation Gameboy clone showing a Loading graphic](screenshots/whichboot-maxstation.png)
+![Whichboot.gb running on a DMG Gameboy](screenshots/whichboot-dmg.png) ![Whichboot.gb running on a GBC Gameboy with the older GBC0 boot ROM](screenshots/whichboot-gbc0.png)
 
 Whichboot.gb is a research tool for identifying Gameboy consoles and emulators through software running on the machine/emulator. It is similar in concept to [Matt Currie's which.gb](https://github.com/mattcurrie/which.gb) but it's using different detection mechanisms and is geared toward detecting different aspects of the running machine than which.gb. Whereas which.gb is trying to detect which SoC revision the ROM is running on by triggering various hardware quirks, whichboot.gb is trying to detect which boot ROM was executed. It does this by detecting the CPU register values left by the boot ROM, as well as the timing of the boot process using `DIV` and `LY`, and the logo data left in VRAM. 
 
@@ -63,6 +63,8 @@ It counts up at a rate of 16384 Hz, which is way slower than the CPU frequency. 
 A custom boot ROM may copy some other graphical data to VRAM instead of the logo present on the cartridge. This is for example the case with the Gameboy clone called MaxStation which has identical initial CPU registers and timing as the DMG boot ROM, but is detectable through the VRAM contents. Many (older) emulators don't write any data at all to VRAM.
 
 Specifically, this test checks the following things, also indicated in the screenshots above.
+
+![Whichboot.gb running on a Maxstation Gameboy clone showing a Loading graphic](screenshots/whichboot-maxstation.png)
 
 **Logo:** Checks for the existence of a logo in tile RAM in the area `$8010-$819F`, aka tiles `$01-$18`. It has the following possible values:
 - **No logo.** The logo tile area was filled with null bytes, indicating no logo graphic was copied there. This is common for many emulators, as well as for the Game Fighter version of the boot ROM, which boots immediately without showing a logo on screen. All official boot ROMs will put a copy of the logo here, including SGB.

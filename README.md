@@ -265,7 +265,7 @@ Another interesting thing is that `B` CPU register is never used, which preserve
 ```
 Initial CPU registers:
 AF:01B0 BC:0014
-DE:BAC6 HL:014D
+DE:BAC6 HL:0133
 SP:FFFE
 
 Timing:

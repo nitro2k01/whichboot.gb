@@ -34,8 +34,11 @@ VPLATF_R_NULL		equ 0<<4
 VPLATF_R_CORRECT	equ 1<<4
 VPLATF_R_UNKNOWN	equ 2<<4
 
-SECTION "Rst00", ROM0[$0]
-	ret
+SECTION "Entry point 0000", ROM0[$0]
+	; Support execution from address 0. (For use with boot ROM skip.)
+	di				; 1
+	jp	ENTRY.entry0		; 4
+
 SECTION "Rst08", ROM0[$8]
 	ret
 SECTION "Rst10", ROM0[$10]
@@ -64,7 +67,6 @@ SECTION "int_serial", ROM0[$58]
 SECTION "int_joy", ROM0[$60]
 	reti
 
-
 SECTION "Header", ROM0[$100]
 	di				; 1
 	jp	ENTRY			; 4
@@ -83,6 +85,24 @@ ENTRY::
 	ld	SP,Stack.top		; 3
 	call	CAPTURE_LY_AND_DIV	; CAPTURE_LY_AND_DIV takes the call into account.
 
+	xor	A			; Signal that we started from the normal entry point.
+	jr	.after_capture
+	; Entry point if PC started at 0. It's easier to just duplicate a few bytes of code
+	; instead of dealing with offsetting the timing measurement.
+.entry0
+	ld	[RegStorage.sp], SP	; 5 Store SP
+	ld	SP,RegStorage.top	; 3 Store the other regs using the stack
+	push	AF			; 4
+	push	BC			; 4
+	push	DE			; 4
+	push	HL			; 4
+
+	ld	SP,Stack.top		; 3
+	call	CAPTURE_LY_AND_DIV	; CAPTURE_LY_AND_DIV takes the call into account.
+
+	ld	A,1			; Signal that we started from entry point 0.
+.after_capture
+	ld	[platform_start0],A
 	ldh	A,[div_acc_store]
 	inc	A			; A==$FF?
 	jr	z,.acc_error_nomath	; Don't do math on the fractional part if it indicates an invalid value.
@@ -135,9 +155,19 @@ ENTRY::
 	add	B			; Add previous value
 
 	ldh	[platform_heur],A
-	bit	1,A
-	jr	z,.noinitgbc
 
+	; This needs to be done before overwriting VRAM.
+	call	DETECT_VRAM_PLATFORM
+
+	; GBC initialization
+	ldh	A,[platform_heur]
+	bit	1,A			; Check for GBC mode in the heuristic match.
+	jr	nz,.initgbc
+
+	ldh	A,[platform_start0]	; Check if we entered from 0. In this case still perform GBC init.
+	or	A
+	jr	z,.noinitgbc
+.initgbc
 	; GBC init
 	ld	A,1
 	ldh	[rVBK],A
@@ -148,6 +178,12 @@ ENTRY::
 	ld	E,L			; L==0
 	call	FASTCLEAR
 
+.noinitgbc
+	; Do a couple of GBC related init tasks even though we're (supposedly) not in GBC mode.
+	; This is insurance that we're able to show things on screen even if we detect the CPU
+	; mode incorrectly somehow. In other case, these are NOPs.
+
+	; Restore VRAM bank.
 	xor	A
 	ldh	[rVBK],A
 
@@ -162,10 +198,7 @@ ENTRY::
 	ld	[$FF00+C],A
 	dec	B
 	jr	nz,.palloop
-.noinitgbc
 
-	; This needs to be done before overwriting VRAM.
-	call	DETECT_VRAM_PLATFORM
 
 	; Clear the tile map for BG 1.
 	ld	HL,$9800
@@ -274,6 +307,13 @@ ENTRY::
 	LDXY	DE,1,$B
 	call	MPRINT
 
+
+	; If we started from address 0, show this instead. (Heuristic match is useless in this case anyway.)
+	ldh	A,[platform_start0]
+	ld	HL,S_START0
+	or	A
+	jr	nz,.print_heur_platform
+
 	; Print platform name derived from heuristics.
 	ldh	A,[platform_heur]
 	ld	HL,S_INVALID			; Check for invalid platform value. (Should never happen.)
@@ -354,7 +394,7 @@ ENTRY::
 	ldh	[rIF],A		; Clear pending interrupt flags.
 	inc	A
 	ldh	[rIE],A		; Enable only VBlank interrupt.
-	ei
+	;ei
 
 .el
 	halt
@@ -807,7 +847,7 @@ GbcPals:
 	PAL_ENTRY	0,0,0
 
 SECTION "Strings", ROM0
-S_ALL:	db "WHICHBOOT.GB V1.0\n"
+S_ALL:	db "WHICHBOOT.GB V1.1\n"
 	db "CPU AF:     BC:\n"
 	db "    DE:     HL:\n"
 	db "    SP:\n"
@@ -849,6 +889,8 @@ REG_REFERENCES:
 	db	$FE,$FF,$0D,$00,$56,$FF,$00,$00,$B0,$11	; VBA GBC
 	db	$FE,$FF,$0D,$00,$56,$FF,$00,$01,$B0,$11	; VBA GBA
 	db	$FE,$FF,$00,$00,$D8,$00,$13,$00,$00,$01	; VBA GBA
+	db	$FE,$FF,$87,$00,$8F,$00,$00,$00,$D0,$11	; PyBoy 1.5.1 GBC
+	db	$FE,$FF,$87,$00,$8F,$00,$00,$00,$D0,$01	; PyBoy 1.5.1 DMG
 
 .end
 
@@ -871,6 +913,8 @@ S_HGB:	db	"DMG BUT WITH A=$11",0
 S_VBA_GBC:	db	"VBA GBC MODE",0
 S_VBA_GBA:	db	"VBA GBA MODE",0
 	db	"JSGB BY IMRAN NAZAR",0
+S_PYBOY_GBC:	db	"PYBOY GBC MODE",0
+S_PYBOY_DMG:	db	"PYBOY DMG MODE",0
 
 
 S_UNK:	db	"NO EXACT MATCH",0
@@ -909,6 +953,15 @@ TIMING_REFERENCES:
 	db	$00,$AC,$02	; BinjGB
 	db	$90,$AB,$34	; WasmBoy DMG mode (And VaporBoy is just WasmBoy?)
 	db	$00,$FF,$3C	; JSGB Pedro Ladaria
+	db	$00,$1A,$12	; Emulicious (DMG, no boot ROM)
+	db	$00,$00,$03	; No boot ROM.
+	db	$00,$AB,$2C	; Ares DMG.
+	db	$90,$22,$28	; Ares GBC.
+	db	$00,$AB,$35	; DMG/GBP+1 M cycle
+	db	$91,$82,$29	; PyBoy 1.5.1
+	db	$99,$F3,$31	; PyBoy 1.5.1 with DMG boot ROM
+	db	$90,$28,$37	; PyBoy 1.5.1 with GBC boot ROM
+
 
 ;	db	$00,$D9,$01-08	; SGB/SGB2 (detected manually because it's a range)
 .end
@@ -977,6 +1030,18 @@ S_GBA_T:db	"GBA",0
 	db	"WASMBOY DMG MODE",0
 
 	db	"JSGB BY PEDRO\n LADARIA",0
+	db	"EMULICIOUS \n (DMG NO BOOT ROM)",0
+	db	"NO BOOT ROM",0
+
+	db	"ARES DMG",0
+	db	"ARES GBC",0
+
+	db	"DMG+1 M CYCLE",0
+
+	db	"PYBOY",0
+	db	"PYBOY+DMG BOOT ROM",0
+	db	"PYBOY+GBC BOOT ROM",0
+
 
 S_UNK_T:db	"NO EXACT MATCH",0
 S_SGB_T:db	"SGB/SGB2(FUZZY)",0
@@ -994,12 +1059,14 @@ S_SGB_GBA_H:	db	"SGB+GBA",0
 
 S_INVALID:	db	"INVALID VALUE!",0
 S_ERROR:	db	"ERROR!",0
+S_START0:	db	"ENTRY POINT 0",0
 
 SECTION "Vars", HRAM
 platform_heur:	DB
 platform_exact:	DB
 platform_timing:DB
 platform_vram:DB
+platform_start0:DB
 ly_store:	DB
 div_store:	DB
 div_acc_store:	DB

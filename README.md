@@ -32,6 +32,17 @@ These are the names of a few of the clones that exist:
 
 Prerequisite: some recent version of RGBDS. Under Linux and presumably macOS, just run `./m.sh`. No Makefile, sorry. Under Windows it should not be too hard to make a `m.bat` file that executes the same commands as `./m.sh`.
 
+## Version history
+
+### Version 1.0
+
+- Initial release.
+
+### Version 1.1
+
+- Added support for using `$0000` as an entry point. Intended for use with entering GBA-GBC mode with boot ROM skip.
+- Added specific detection for a bunch more emulators from the [GB Emulator Shootout](https://daid.github.io/GBEmulatorShootout/).
+
 ## Detection mechanisms
 
 This is a description of the various detection mechanism used by whichboot.gb.
@@ -41,6 +52,8 @@ This is a description of the various detection mechanism used by whichboot.gb.
 This is a simple, non-exhaustive matching algorithm which is meant to represent what a typical game would detect. For example, if the heuristic match says GBC or GBA, it's likely that a typical dual platform game would run in GBC mode. If the heuristic match says GBA, some games will load a brighter palette to compensate for the GBA's darker display.
 
 This algorithm also tries to detect Super Gameboy through the recommended method of reading the joypad in multiplayer mode. Some emulators have a special configuration known as GBC+SGB or similar, which allows the game to set a SGB border etc even though the emulated machine is a Gameboy Color. Whichboot.gb can detect this mode as well.
+
+This field can also say "entry point 0", which means whichboot.gb started running from the entry point $0000. This can for example happen if you run it on a GBA with boot ROM skip, or in Emulicious with "no boot ROM" selected as the boot ROM under options, emulation.
 
 ### CPU registers
 

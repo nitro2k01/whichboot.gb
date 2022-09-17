@@ -204,7 +204,7 @@ Just like with DMG, Gameboy Color was found to have an early SoC and boot ROM re
 
 ### Gameboy Color (mainline boot ROM version)
 
-![Whichboot.gb running on a GBC Gameboy with the mainline boot ROM](screenshots/whichboot-gbc0.png)
+![Whichboot.gb running on a GBC Gameboy with the mainline boot ROM](screenshots/whichboot-gbc.png)
 
 ```
 Initial CPU registers:
@@ -222,7 +222,7 @@ The initial CPU registers are identical between the GBC0 and GBC revisions of th
 
 ### Gameboy Advance
 
-![Whichboot.gb running on a GBA Gameboy](screenshots/whichboot-gbc0.png)
+![Whichboot.gb running on a GBA Gameboy](screenshots/whichboot-gba.png)
 
 ```
 Initial CPU registers:
@@ -240,7 +240,7 @@ The GBA has two different known revisions, of which one fixes the TOCTTOU vulner
 
 ### Game Fighter (Clone)
 
-![Whichboot.gb running on a Game Fighter Gameboy clone](screenshots/whichboot-gbc0.png)
+![Whichboot.gb running on a Game Fighter Gameboy clone](screenshots/whichboot-gamefighter.png)
 
 ```
 Initial CPU registers:
@@ -260,7 +260,7 @@ Another interesting thing is that `B` CPU register is never used, which preserve
 
 ### Fortune SY-3000B (Clone)
 
-![Whichboot.gb running on a Fortune SY-3000B Gameboy clone](screenshots/whichboot-gbc0.png)
+![Whichboot.gb running on a Fortune SY-3000B Gameboy clone](screenshots/whichboot-fortune.png)
 
 ```
 Initial CPU registers:

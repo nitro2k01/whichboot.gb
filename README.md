@@ -38,7 +38,7 @@ This is a description of the various detection mechanism used by whichboot.gb.
 
 ### Heuristic match
 
-This is a simple, non-exhaustive matching algorithm which is meant to represent what a typical game would detect. For example, if the heuristic match says GBC or GBA, it's likely that a typical dual platform game would run in GBC mode. If the heuristic match sayc GBA, some games will load a brighter palette to compensate for the GBA's darker display.
+This is a simple, non-exhaustive matching algorithm which is meant to represent what a typical game would detect. For example, if the heuristic match says GBC or GBA, it's likely that a typical dual platform game would run in GBC mode. If the heuristic match says GBA, some games will load a brighter palette to compensate for the GBA's darker display.
 
 This algorithm also tries to detect Super Gameboy through the recommended method of reading the joypad in multiplayer mode. Some emulators have a special configuration known as GBC+SGB or similar, which allows the game to set a SGB border etc even though the emulated machine is a Gameboy Color. Whichboot.gb can detect this mode as well.
 
@@ -89,6 +89,236 @@ Specifically, this test checks the following things, also indicated in the scree
 ## Acknowledgements
 
 I wish to thank beware for making [BGB](https://bgb.bircd.org/), which was useful in debugging this, and every other, Gameboy project I make. I also wish to thank bbbbbr for [dumping the boot ROM of the MaxStation GB clone](https://twitter.com/0xbbbbbr/status/1568132567018389510), which prompted the last minute addition of the logo match check.
+
+## Reference values for hardware
+
+These are the reference values for the boot ROMs variations (official and bootleg) that are detectable by whichboot.gb, with some notes for each.
+
+### DMG0
+
+![Whichboot.gb running on a DMG Gameboy with the older DMG0 boot ROM](screenshots/whichboot-dmg0.png)
+
+```
+Initial CPU registers:
+AF:0100 BC:FF13
+DE:00C1 HL:8403
+SP:FFFE
+
+Timing:
+LY:91 DIV:18.0D
+```
+
+The very first known version of the DMG SoC and boot ROM. Probably only found in units with serial number below G1000000 or thereabout, and probably only ever sold in Japan. Notably, this version of the boot ROM is missing the ® symbol to the right of the logo, and will flash the whole screen if the logo/header data is invalid instead of scrolling down the whatever was read from the cartridge and then locking up. The main revision of the DMG boot ROM went through some major overhaul so the initial registers and timings are pretty different between them. 
+
+### DMG
+
+![Whichboot.gb running on a DMG Gameboy with the mainline DMG boot ROM](screenshots/whichboot-dmg.png)
+
+```
+Initial CPU registers:
+AF:01B0 BC:0013
+DE:00D8 HL:014D
+SP:FFFE
+
+Timing:
+LY:00 DIV:AB.34
+```
+
+The mainline revision of the DMG boot ROM. 
+
+### Gameboy Pocket
+
+![Whichboot.gb running on a Gameboy Pocket](screenshots/whichboot-gbp.png)
+
+```
+Initial CPU registers:
+AF:FFB0 BC:0013
+DE:00D8 HL:014D
+SP:FFFE
+
+Timing:
+LY:00 DIV:AB.34
+```
+
+Almost identical to the mainline DMG bootstrap except for one byte near the end. 
+```
+ld  A,$01
+ldh [$FF50], A  ; Boot ROM lockout register
+```
+...was replaced with...
+```
+ld  A,$FF
+ldh [$FF50], A  ; Boot ROM lockout register
+```
+...specifically to allow Gameboy Pocket to be detected by the game. The lockout register only cares that bit 0 is set, so this still works form that point of view.
+
+### Super Gameboy
+
+![Whichboot.gb running on a Super Gameboy](screenshots/whichboot-sgb.png)
+
+```
+Initial CPU registers:
+AF:0100 BC:0014
+DE:0000 HL:C060
+SP:FFFE
+
+Timing:
+LY:00 DIV:D8.12-D8.19
+```
+
+The Super Gameboy boot ROM is notable for not actually having any logo/checksum lockout functionality. Instead, it transfers the full header to the SNES, and lets it take the decision whether to allow the game to boot. 
+
+Because the boot ROM's data transfer code takes a different amount of time to transfer a set and a cleared bit, there's some variation in the measured timing value depending on the exact contents of the ROM header. A limitation of the current version of whichboot.gb is that it only checks whether the value is within the valid range for SGB. A better test would calculate the exact expected timings from the ROM header and only match SGB for that exact value.
+
+### Super Gameboy 2
+
+![Whichboot.gb running on a Super Gameboy 2](screenshots/whichboot-sgb2.png)
+
+```
+Initial CPU registers:
+AF:FF00 BC:0014
+DE:0000 HL:C060
+SP:FFFE
+
+Timing:
+LY:00 DIV:D8.12-D8.19
+```
+
+Just like Gameboy Pocket boot ROM, this is just a one byte change that sets `A=$FF` to allow detection. This is used by Tetris DX to display a different SGB border depending on the SGB revision.
+
+### Gameboy Color (GBC0)
+
+![Whichboot.gb running on a GBC Gameboy with the older GBC0 boot ROM](screenshots/whichboot-gbc0.png)
+
+```
+Initial CPU registers:
+AF:1180 BC:0000
+DE:FF56 HL:000D
+SP:FFFE
+
+Timing:
+LY:90 DIV:20.2B
+```
+
+Just like with DMG, Gameboy Color was found to have an early SoC and boot ROM revision, which is relatively rare. 
+
+### Gameboy Color (mainline boot ROM version)
+
+![Whichboot.gb running on a GBC Gameboy with the mainline boot ROM](screenshots/whichboot-gbc0.png)
+
+```
+Initial CPU registers:
+AF:1180 BC:0000
+DE:FF56 HL:000D
+SP:FFFE
+
+Timing:
+LY:90 DIV:1E.28
+```
+
+This is the mainline revision, found in the vast majority of GBCs. The boot ROM was changed to clear audio channel 3's wave RAM. This is a software fix for R-Type, which is missing audio channel 3 on the title screen unless wave RAM is initialized with an audible waveform. (Pre-GBC hardware would have random data in wave RAM which would produce a sound, whereas GBC has all zeroes at reset.) They also differ in a couple of other minor ways.
+
+The initial CPU registers are identical between the GBC0 and GBC revisions of the boot ROM, but can be detected using timing (like whichboot.gb does) or by inspecting wave RAM on boot.
+
+### Gameboy Advance
+
+![Whichboot.gb running on a GBA Gameboy](screenshots/whichboot-gbc0.png)
+
+```
+Initial CPU registers:
+AF:1180 BC:0100
+DE:FF56 HL:000D
+SP:FFFE
+
+Timing:
+LY:90 DIV:1E.29
+```
+
+The GBA's GBC mode differs by setting `B=$01`. This is intended for identifying GBA so that the game can compensate for the GBA's darker LCD screen. It also takes one M cycle longer to boot.
+
+The GBA has two different known revisions, of which one fixes the TOCTTOU vulnerability that allows the Nintendo logo to be swapped using special hardware. However, the difference between these two revisions can't be detected using the methods that whichboot.gb is using. Detection would require either running a game that does logo swap and see if the logo swap was successful, or monitoring the bus activity using a logic analyzer or similar tool.
+
+### Game Fighter (Clone)
+
+![Whichboot.gb running on a Game Fighter Gameboy clone](screenshots/whichboot-gbc0.png)
+
+```
+Initial CPU registers:
+AF:01C0 BC:0013
+DE:005B HL:0134
+SP:FFFE
+
+Timing:
+LY:03 DIV:87.0A
+```
+
+The first Gameboy clone boot ROM I personally dumped. I'm calling this boot ROM variant Game Fighter after the device it was dumped from, but in reality the same boot ROM might exist on other clone devices as well.
+
+This one boots right into the game, and doesn't show any graphics or play any sound. It doesn't check the checksum and only checks the second half the logo. However, one interesting thing about this boot ROM is that it checks against both the Nintendo, and some unknown logo. We can reconstruct the bottom half of from the data in the boot ROM. You can read more about this on my blog: [Dumping the boot ROM of the Gameboy clone Game Fighter](https://blog.gg8.se/wordpress/2014/12/09/dumping-the-boot-rom-of-the-gameboy-clone-game-fighter/)
+
+Another interesting thing is that `B` CPU register is never used, which preserves whatever value it was at boot, which seems to always be 0.
+
+### Fortune SY-3000B (Clone)
+
+![Whichboot.gb running on a Fortune SY-3000B Gameboy clone](screenshots/whichboot-gbc0.png)
+
+```
+Initial CPU registers:
+AF:01B0 BC:0014
+DE:BAC6 HL:014D
+SP:FFFE
+
+Timing:
+LY:94 DIV:B1.0D
+```
+
+The second Gameboy clone boot ROM I personally dumped. I'm calling this boot ROM variant Fortune after the device it was dumped from, but in reality the same boot ROM might exist on other clone devices as well. 
+
+This boot ROM does show the Nintendo logo, but without any animation, and plays a single note chime.
+
+### GB Boy (Clone)
+
+```
+Initial CPU registers:
+AF:01B0 BC:0013
+DE:00D8 HL:014D
+SP:FFFE
+
+Timing:
+LY:00 DIV:AB.34
+```
+
+The monochrome GB Boy, also sometimes referred to as the GB Boy Pocket due to its similarity to the Gameboy Pocket, has a custom boot logo that say SGM. Due to this, you might be lead to believe that it has a custom boot ROM. But in fact, it has a stock DMG boot ROM, and thus identical initial values. Instead, it does graphical replacement on the data that comes out of the PPU. Thus, it's undetectable using any method used by whichboot.gb and detects as a DMG.
+
+### GB Boy Colour (Clone)
+
+```
+Initial CPU registers:
+AF:1180 BC:0000
+DE:FF56 HL:000D
+SP:FFFE
+
+Timing:
+LY:90 DIV:1E.28
+```
+
+The GB Boy Colour has replaced the Gameboy logo with a GB Boy logo, and has also doesn't show the Nintendo logo from the cartridge. This is done using a modified boot ROM, however the execution path is cycle for cycle identical and the initial CPU registers are identical as well, so whichboot.gb's tests are detecting it as a mainline GBC. Both the GB Boy and GB Boy Colour can be detected through glitches, as shown in [jbshelton's fork of which.gb](https://github.com/jbshelton/which.gb). However, such detection methods are outside the scope of whichboot.gb.
+
+### Maxstation (clone)
+
+![Whichboot.gb running on a Maxstation Gameboy clone showing a Loading graphic](screenshots/whichboot-maxstation.png)
+
+```
+Initial CPU registers:
+AF:01B0 BC:0013
+DE:00D8 HL:014D
+SP:FFFE
+
+Timing:
+LY:00 DIV:AB.34
+```
+
+The Maxstation has the boot logo replaced with "Loading..." which is done with a modified DMG boot ROM. The boot ROM's execution path is cycle for cycle identical to that of DMG, however it can be detected by looking for the "Loading..." graphics left in VRAM. Because it's similar to the DMG boot ROM, it does run the code that shows the ® symbol, only that the tile data for the ® has been blanked out so that it copies null bytes into VRAM instead.
 
 ## Notes on various emulators
 
